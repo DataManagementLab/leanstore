@@ -144,7 +144,7 @@
   become: yes
   vars:
     remote_dir: /root/lab24-log-service-benchmark/workload-generator
-    local_workload_dir: /home/nati/Desktop/DMLAB/lab24-log-service-benchmark/workload-generator
+    local_workload_dir: /home/DMLAB/lab24-log-service-benchmark/workload-generator
   tasks:
     - name: Ensure Maven is installed
       apt:
@@ -162,7 +162,7 @@
         dest: "{{ remote_dir }}/{{ item.dest }}"
         mode: '0755'
       loop:
-        - { src: '/home/nati/Desktop/DMLAB/lab24-log-service-benchmark/workload-generator/target/bookkeeper-workload-generator-1.0.jar', dest: 'bookkeeper-workload-generator-1.0.jar' }
+        - { src: '/home/DMLAB/lab24-log-service-benchmark/workload-generator/target/bookkeeper-workload-generator-1.0.jar', dest: 'bookkeeper-workload-generator-1.0.jar' }
         - { src: '{{ local_workload_dir }}/runsync.sh', dest: 'runsync.sh' }
 
     - name: Run benchmark
