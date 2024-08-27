@@ -1,24 +1,59 @@
-# testdeploy
-DM lab aws test deployment
+# AWS Test Deployment
+Automates the deployment of the Benchmark using Terraform, Ansible, and AWS. It includes a test environment using LocalStack and mock EC2 containers for local testing before actual AWS deployment.
 
-# install 
-    terrafrom 
-    aws cli - sudo apt-get install awscli
-    ansible
+# Prerequisites
+Ensure you have the following tools installed:
+    
+- Terraform
+- AWS CLI
+- Ansible
+- Docker and Docker Compose (for local testing)
+
 # Runing the Terraform
-    terraform init
-    terraform plan
-    terraform apply
-    terraform output
-# AWS cli
-    aws configure
+   
+- terraform init
+- terraform plan
+- terraform apply
+- terraform output
 
-    export AWS_ACCESS_KEY_ID=your_access_key_id
-    export AWS_SECRET_ACCESS_KEY=your_secret_access_key
-    export AWS_DEFAULT_REGION=your_region
+# Local Testing
+1. Start LocalStack and Mock EC2 Containers: The mock-ec2 container uses a Dockerfile defined in the cloud-scripts directory. Ensure you have a public key (benchmark_key.pub) for SSH communication. Then, start the containers:
+```bash
+docker-compose up -d
+```
+2. Run the Ansible playbook with the mock inventory:
+```bash
+ansible-playbook -i inventory-mock.ini testansible.yml
 
-
-    aws --endpoint-url=http://localhost:4566 ec2 describe-instances --query 'Reservations[].Instances[].[InstanceId,InstanceType,PublicIpAddress,Tags[?Key==`Name`]| [0].Value]' --output table --region us-west-2
+ansible-playbook -i inventory-mock.ini playbook.yml
+```
+# AWS Deployment
+1. Configure AWS CLI:
+```bash
+# set your_access_key_id to "test" for local test
+aws configure
+# Or set environment variables:
+export AWS_ACCESS_KEY_ID=your_access_key_id
+export AWS_SECRET_ACCESS_KEY=your_secret_access_key
+export AWS_DEFAULT_REGION=your_region
+```
+2. Initialize Terraform:
+```bash
+terraform init
+```
+3. Plan and apply the Terraform configuration:
+```bash
+terraform plan
+terraform apply
+```
+4. View the created resources:
+```bash
+terraform output
+```
+5. List EC2 instances:
+```bash
+ aws --endpoint-url=http://localhost:4566 ec2 describe-instances --query 'Reservations[].Instances[].[InstanceId,InstanceType,PublicIpAddress,Tags[?Key==`Name`]| [0].Value]' --output table --region us-west-2
+```
     ------------------------------------------------------------------------------
     |                              DescribeInstances                             |
     +----------------------+-----------+-----------------+-----------------------+
@@ -32,16 +67,18 @@ DM lab aws test deployment
     |  i-21b8593ea3847f47d |  t2.micro |  54.214.254.185 |  bookie-1             |
     +----------------------+-----------+-----------------+-----------------------+
 
-# ansible
-    ansible-playbook -i inventory-mock.ini testansibel.yml
-
-# [Running Replicated ZooKeeper](https://zookeeper.apache.org/doc/current/zookeeperStarted.html#sc_RunningReplicatedZooKeeper)
-
-
-# BK and Zk
-/opt/bookkeeper/bin/bookkeeper shell listbookies -rw
-
+# Verifying the Deployment
+## ZooKeeper
+```bash
 /opt/zookeeper/bin/zkServer.sh status
-
-
- 
+```
+## BookKeeper
+```bash
+/opt/bookkeeper/bin/bookkeeper shell listbookies -rw
+```
+# Cleaning Up
+To destroy the AWS resources created by Terraform:
+```bash
+terraform destroy
+docker-compose down
+```
