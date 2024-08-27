@@ -1,6 +1,7 @@
 ---
 - name: Install and Configure Zookeeper
   hosts: zookeepers
+  connection: ssh
   become: yes
   vars:
     java_version: "17"
@@ -62,6 +63,7 @@
 
 - name: Install and Configure BookKeeper
   hosts: bookies
+  connection: ssh
   become: yes
   vars:
     java_version: "17"
@@ -126,6 +128,7 @@
 
 - name: Install BookKeeper Clients
   hosts: clients
+  connection: ssh
   become: yes
   vars:
     java_version: "17"
@@ -139,12 +142,14 @@
         state: present
         update_cache: yes
 
-- name: Deploy and Run Benchmark
+- name: Deploy and copy Benchmark
   hosts: bookkeeper-client-1
+  connection: ssh
   become: yes
   vars:
-    remote_dir: /root/lab24-log-service-benchmark/workload-generator
-    local_workload_dir: /home/DMLAB/lab24-log-service-benchmark/workload-generator
+    remote_dir: /root/
+    # change local_dir to the correct path of lab24-log-service-benchmark
+    local_dir: /home/nati/Desktop/DMLAB/lab24-log-service-benchmark
   tasks:
     - name: Ensure Maven is installed
       apt:
@@ -155,41 +160,29 @@
       file:
         path: "{{ remote_dir }}"
         state: directory
-
-    - name: Copy benchmark files
-      copy:
-        src: "{{ item.src }}"
-        dest: "{{ remote_dir }}/{{ item.dest }}"
-        mode: '0755'
-      loop:
-        - { src: '/home/DMLAB/lab24-log-service-benchmark/workload-generator/target/bookkeeper-workload-generator-1.0.jar', dest: 'bookkeeper-workload-generator-1.0.jar' }
-        - { src: '{{ local_workload_dir }}/runsync.sh', dest: 'runsync.sh' }
-
-    - name: Run benchmark
-      shell: ./runsync.sh
-      args:
-        chdir: "{{ remote_dir }}"
-
-- name: Copy remote folder to local directory
-  hosts: bookkeeper-client-1
-  become: yes
-  vars:
-    remote_dir: /root/lab24-log-service-benchmark/workload-generator/ExperimentResult
-    archive_name: ExperimentResult.tar.gz
-  tasks:
-    - name: Create archive of ExperimentResult folder
-      archive:
-        path: "{{ remote_dir }}"
-        dest: "/tmp/{{ archive_name }}"
-        format: gz
-
-    - name: Fetch the archive
-      fetch:
-        src: "/tmp/{{ archive_name }}"
-        dest: "./{{ archive_name }}"
-        flat: yes
-
-    - name: Remove temporary archive on remote
+    
+    - name: Remove existing lab24-log-service-benchmark folder if it exists
       file:
-        path: "/tmp/{{ archive_name }}"
+        path: "{{ remote_dir }}/lab24-log-service-benchmark"
         state: absent
+    
+    - name: Copy entire lab24-log-service-benchmark folder
+      copy:
+        src: "{{ local_dir }}"
+        dest: "{{ remote_dir }}"
+        mode: '0755'
+
+    - name: Install Python
+      apt:
+        name: python3
+        state: present
+
+    - name: Install pip
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Install Python requirements
+      pip:
+        requirements: "{{ remote_dir }}/lab24-log-service-benchmark/experiment-runner/src/requirements.txt"
+        executable: pip3
