@@ -26,17 +26,10 @@ variable "instance_types" {}
 variable "num_instances" {}
 
 provider "aws" {
-  access_key                  = "test"
-  secret_key                  = "test"
+  access_key                  = "your_access_key"
+  secret_key                  = "your_secret_key"
   region                      = var.region
 
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  skip_requesting_account_id  = true
-
-  endpoints {
-    ec2 = "http://localhost:4566"
-  }
 }
 
 
@@ -118,7 +111,7 @@ resource "aws_instance" "bookie" {
   count         = var.num_instances["bookkeeper"]
 
   tags = {
-    Name = "bookie-${count.index}"
+    Name = "bookie-${count.index + 1}"
   }
 }
 
@@ -131,7 +124,7 @@ resource "aws_instance" "zookeeper" {
   count         = var.num_instances["zookeeper"]
 
   tags = {
-    Name = "zk-${count.index}"
+    Name = "zk-${count.index + 1}"
   }
 }
 
@@ -144,7 +137,7 @@ resource "aws_instance" "client" {
   count = var.num_instances["client"]
 
   tags = {
-    Name = "bookkeeper-client-${count.index}"
+    Name = "bookkeeper-client-${count.index + 1}"
   }
 }
 
