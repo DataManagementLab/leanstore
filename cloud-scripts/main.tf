@@ -2,11 +2,27 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.16"
+      version = "~> 5.56"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "3.1"
+    }
+    ansible = {
+      source = "ansible/ansible"
+      version = "1.3.0"
     }
   }
+}
 
-  required_version = ">= 1.2.0"
+variable "public_key_path" {
+  description = <<DESCRIPTION
+Path to the SSH public key to be used for authentication.
+Ensure this keypair is added to your local SSH agent so provisioners can
+connect.
+
+Example: ~/.ssh/bookkeeper_aws.pub
+DESCRIPTION
 }
 
 resource "random_id" "hash" {
@@ -14,24 +30,25 @@ resource "random_id" "hash" {
 }
 
 variable "key_name" {
-  default     = "benchmark-key"
+  default     = "bookkeeper-benchmark-key"
   description = "Desired name prefix for the AWS key pair"
 }
 
-variable "public_key_path" {}
 variable "region" {}
 variable "az" {}
 variable "ami" {}
+variable "spot" {}
 variable "instance_types" {}
 variable "num_instances" {}
 
 provider "aws" {
-  access_key                  = "your_access_key"
-  secret_key                  = "your_secret_key"
-  region                      = var.region
-
+  region = var.region
+   default_tags {
+      tags = {
+      Project = "logservice"
 }
-
+}
+}
 
 # Create a VPC to launch our instances into
 resource "aws_vpc" "benchmark_vpc" {
@@ -82,6 +99,20 @@ resource "aws_security_group" "benchmark_security_group" {
     cidr_blocks = ["10.0.0.0/16"]
   }
 
+  # Prometheus/Dashboard access
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # outbound internet access
   egress {
     from_port   = 0
@@ -95,24 +126,9 @@ resource "aws_security_group" "benchmark_security_group" {
   }
 }
 
-
 resource "aws_key_pair" "auth" {
   key_name   = "${var.key_name}-${random_id.hash.hex}"
   public_key = file(var.public_key_path)
-}
-
-
-resource "aws_instance" "bookie" {
-  ami           = var.ami
-  instance_type = var.instance_types["bookkeeper"]
-  key_name      = aws_key_pair.auth.id
-  subnet_id     = aws_subnet.benchmark_subnet.id
-  vpc_security_group_ids = [ aws_security_group.benchmark_security_group.id ]
-  count         = var.num_instances["bookkeeper"]
-
-  tags = {
-    Name = "bookie-${count.index + 1}"
-  }
 }
 
 resource "aws_instance" "zookeeper" {
@@ -120,11 +136,44 @@ resource "aws_instance" "zookeeper" {
   instance_type = var.instance_types["zookeeper"]
   key_name      = aws_key_pair.auth.id
   subnet_id     = aws_subnet.benchmark_subnet.id
-  vpc_security_group_ids = [aws_security_group.benchmark_security_group.id]
-  count         = var.num_instances["zookeeper"]
+  vpc_security_group_ids = [
+  aws_security_group.benchmark_security_group.id]
+  count = var.num_instances["zookeeper"]
+  dynamic "instance_market_options" {
+     for_each = var.spot ? [1] : []
+     content {
+         market_type = "spot"
+         spot_options {
+           max_price = 0.5
+         }
+       }
+   }
+  
+  tags = {
+    Name = "zk-${count.index}"
+  }
+}
+
+resource "aws_instance" "bookie" {
+  ami           = var.ami
+  instance_type = var.instance_types["bookie"]
+  key_name      = aws_key_pair.auth.id
+  subnet_id     = aws_subnet.benchmark_subnet.id
+  vpc_security_group_ids = [
+  aws_security_group.benchmark_security_group.id]
+  count = var.num_instances["bookie"]
+  dynamic "instance_market_options" {
+     for_each = var.spot ? [1] : []
+     content {
+         market_type = "spot"
+         spot_options {
+           max_price = 0.7
+         }
+     }
+  }
 
   tags = {
-    Name = "zk-${count.index + 1}"
+    Name = "bookie-${count.index}"
   }
 }
 
@@ -133,14 +182,100 @@ resource "aws_instance" "client" {
   instance_type = var.instance_types["client"]
   key_name      = aws_key_pair.auth.id
   subnet_id     = aws_subnet.benchmark_subnet.id
-  vpc_security_group_ids = [aws_security_group.benchmark_security_group.id]
+  vpc_security_group_ids = [
+  aws_security_group.benchmark_security_group.id]
   count = var.num_instances["client"]
+  dynamic "instance_market_options" {
+     for_each = var.spot ? [1] : []
+     content {
+         market_type = "spot"
+         spot_options {
+           max_price = 0.9
+         }
+     }
+  }
 
   tags = {
-    Name = "bookkeeper-client-${count.index + 1}"
+    Name = "bookkeeper-client-${count.index}"
   }
 }
 
+resource "aws_instance" "prometheus" {
+  ami           = var.ami
+  instance_type = var.instance_types["prometheus"]
+  key_name      = aws_key_pair.auth.id
+  subnet_id     = aws_subnet.benchmark_subnet.id
+  vpc_security_group_ids = [
+  aws_security_group.benchmark_security_group.id]
+  count = var.num_instances["prometheus"]
+  dynamic "instance_market_options" {
+     for_each = var.spot ? [1] : []
+     content {
+         market_type = "spot"
+         spot_options {
+           max_price = 0.09
+         }
+     }
+  }
+
+  tags = {
+    Name = "prometheus-${count.index}"
+  }
+}
+
+# Inventory host resource.
+resource "ansible_host" "zookeeper" {
+  name = "zk-${count.index}"
+  groups = ["zookeepers"] # Groups this host is part of.
+  count = var.num_instances["zookeeper"]
+
+  variables = {
+    # Connection vars.
+    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_host = aws_instance.zookeeper[count.index].public_ip
+
+    # Custom vars that we might use in roles/tasks.
+  }
+}
+resource "ansible_host" "bookie" {
+  name = "bookie-${count.index}"
+  groups = ["bookies"] # Groups this host is part of.
+  count = var.num_instances["bookie"]
+
+  variables = {
+    # Connection vars.
+    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_host = aws_instance.bookie[count.index].public_ip
+
+    # Custom vars that we might use in roles/tasks.
+  }
+}
+resource "ansible_host" "client" {
+  name = "client-${count.index}"
+  groups = ["clients"] # Groups this host is part of.
+  count = var.num_instances["client"]
+
+  variables = {
+    # Connection vars.
+    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_host = aws_instance.client[count.index].public_ip
+
+    # Custom vars that we might use in roles/tasks.
+  }
+}
+resource "ansible_host" "prometheus" {
+  name = "prometheus-${count.index}"
+  groups = ["prometheus"] # Groups this host is part of.
+  count = var.num_instances["prometheus"]
+
+  variables = {
+    # Connection vars.
+    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_host = aws_instance.prometheus[count.index].public_ip
+
+    # Custom vars that we might use in roles/tasks.
+  }
+}
 
 output "zookeeper" {
   value = {
@@ -163,24 +298,17 @@ output "client" {
   }
 }
 
-resource "local_file" "ansible_inventory" {
-  content = <<EOF
-[bookies]
-%{ for instance in aws_instance.bookie }
-${instance.tags.Name} ansible_host=${instance.private_ip}
-%{ endfor }
-
-[zookeepers]
-%{ for instance in aws_instance.zookeeper }
-${instance.tags.Name} ansible_host=${instance.private_ip}
-%{ endfor }
-
-[clients]
-%{ for instance in aws_instance.client }
-${instance.tags.Name} ansible_host=${instance.private_ip}
-%{ endfor }
-EOF
-
-  filename = "${path.module}/inventory.ini"
+output "prometheus" {
+  value = {
+    for instance in aws_instance.prometheus :
+    instance.public_ip => instance.private_ip
+  }
 }
 
+output "client_ssh_host" {
+  value = aws_instance.client.0.public_ip
+}
+
+output "prometheus_host" {
+  value = aws_instance.prometheus.0.public_ip
+}
