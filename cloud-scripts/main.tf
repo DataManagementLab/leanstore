@@ -156,12 +156,12 @@ resource "aws_instance" "zookeeper" {
 
 resource "aws_instance" "bookie" {
   ami           = var.ami
-  instance_type = var.instance_types["bookie"]
+  instance_type = var.instance_types["bookkeeper"]
   key_name      = aws_key_pair.auth.id
   subnet_id     = aws_subnet.benchmark_subnet.id
   vpc_security_group_ids = [
   aws_security_group.benchmark_security_group.id]
-  count = var.num_instances["bookie"]
+  count = var.num_instances["bookkeeper"]
   dynamic "instance_market_options" {
      for_each = var.spot ? [1] : []
      content {
@@ -231,7 +231,7 @@ resource "ansible_host" "zookeeper" {
 
   variables = {
     # Connection vars.
-    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_user = "ubuntu" # Default user depends on the OS.
     ansible_host = aws_instance.zookeeper[count.index].public_ip
 
     # Custom vars that we might use in roles/tasks.
@@ -240,11 +240,11 @@ resource "ansible_host" "zookeeper" {
 resource "ansible_host" "bookie" {
   name = "bookie-${count.index}"
   groups = ["bookies"] # Groups this host is part of.
-  count = var.num_instances["bookie"]
+  count = var.num_instances["bookkeeper"]
 
   variables = {
     # Connection vars.
-    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_user = "ubuntu" # Default user depends on the OS.
     ansible_host = aws_instance.bookie[count.index].public_ip
 
     # Custom vars that we might use in roles/tasks.
@@ -257,7 +257,7 @@ resource "ansible_host" "client" {
 
   variables = {
     # Connection vars.
-    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_user = "ubuntu" # Default user depends on the OS.
     ansible_host = aws_instance.client[count.index].public_ip
 
     # Custom vars that we might use in roles/tasks.
@@ -270,7 +270,7 @@ resource "ansible_host" "prometheus" {
 
   variables = {
     # Connection vars.
-    ansible_user = "ec2-user" # Default user depends on the OS.
+    ansible_user = "ubuntu" # Default user depends on the OS.
     ansible_host = aws_instance.prometheus[count.index].public_ip
 
     # Custom vars that we might use in roles/tasks.

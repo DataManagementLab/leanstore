@@ -24,74 +24,57 @@
   connection: ssh
   become: true
   tasks:
-    - name: Initialize empty list for devices
-      set_fact:
-        storage_devices: []
-      no_log: true
-
-    - name: Get NVMe devices
-      set_fact:
-        storage_devices: "{{ storage_devices + ['/dev/' ~ item.key ] }}"
-      with_dict: "{{ ansible_devices }}"
-      when: "item.value.host.startswith('Non-Volatile memory controller:') and not item.value.partitions"
-
-    - name: Show device names
-      debug: var=storage_devices
-
-    - name: Format disks
-      filesystem:
-        fstype: xfs
-        dev: '{{ item }}'
-      with_items:
-        - "{{ storage_devices[0] }}"
-        - "{{ storage_devices[1] }}"
+    - name: Unmount
+      mount:
+        path: /mnt
+        state: unmounted
+    # - name: Format disks
+    #   filesystem:
+    #     fstype: xfs
+    #     dev: '{{ item }}'
+    #     force: true
+    #   with_items:
+    #     - "/dev/xvdb"
+    #     - "/dev/xvdc"
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
         src: "{{ item.src }}"
-        fstype: xfs
+        fstype: ext2
         opts: defaults,noatime,nodiscard
         state: mounted
       with_items:
-        - { path: "/mnt/zookeeper/logs", src: "{{ storage_devices[0] }}" }
-        - { path: "/mnt/zookeeper/data", src: "{{ storage_devices[1] }}" }
+        - { path: "/mnt/zookeeper/logs", src: "/dev/xvdb" }
+        - { path: "/mnt/zookeeper/data", src: "/dev/xvdc" }
 
-- name: Format and mount disks for BookKeeper hosts
+
+- name: Format and mount disks for Pulsar/BookKeeper hosts
   hosts: bookies
   connection: ssh
   become: true
   tasks:
-    - name: Initialize empty list for devices
-      set_fact:
-        storage_devices: []
-      no_log: true
-
-    - name: Get NVMe devices
-      set_fact:
-        storage_devices: "{{ storage_devices + ['/dev/' ~ item.key ] }}"
-      with_dict: "{{ ansible_devices }}"
-      when: "item.value.host.startswith('Non-Volatile memory controller:') and not item.value.partitions"
-
-    - name: Show device names
-      debug: var=storage_devices
-
-    - name: Format disks
-      filesystem:
-         fstype: xfs
-         dev: '{{ item }}'
-      with_items:
-        - "{{ storage_devices[0] }}"
-        - "{{ storage_devices[1] }}"
+    - name: Unmount
+      mount:
+        path: /mnt
+        state: unmounted
+    # - name: Format disks
+    #   filesystem:
+    #      fstype: xfs
+    #      dev: '{{ item }}'
+    #      force: true
+    #   with_items:
+    #     - "/dev/xvdb"
+    #     - "/dev/xvdc"
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
         src: "{{ item.src }}"
-        fstype: xfs
+        fstype: ext2
         opts: defaults,noatime,nodiscard
         state: mounted
       with_items:
-        - { path: "/mnt/journal", src: "{{ storage_devices[0] }}" }
-        - { path: "/mnt/storage", src: "{{ storage_devices[1] }}" }
+        - { path: "/mnt/journal", src: "/dev/xvdb" }
+        - { path: "/mnt/storage", src: "/dev/xvdc" }
 
 - name: Common Installation Tasks
   hosts: all
@@ -117,62 +100,62 @@
 
 
 
-- name: Install Node exporter on Brokers to collect system metrics
-  hosts: bookies
-  become: true
-  tasks:
-    - name: Add user node_exporter
-      user:
-        name: node_exporter
-        shell: /bin/false
-        system: true
-        create_home: no
-    - name: Download and extract
-      unarchive:
-        src: "{{ node_exporter_binary.src }}"
-        dest: /tmp
-        remote_src: "{{ node_exporter_binary.remote }}"
+# - name: Install Node exporter on Brokers to collect system metrics
+#   hosts: bookies
+#   become: true
+#   tasks:
+#     - name: Add user node_exporter
+#       user:
+#         name: node_exporter
+#         shell: /bin/false
+#         system: true
+#         create_home: no
+#     - name: Download and extract
+#       unarchive:
+#         src: "{{ node_exporter_binary.src }}"
+#         dest: /tmp
+#         remote_src: "{{ node_exporter_binary.remote }}"
 
-    - name: Copy bin node_exporter to /usr/local/bin
-      copy:
-        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
-        remote_src: yes
-        dest: /usr/local/bin/
-        owner: node_exporter
-        group: node_exporter
-        mode: u+x,g+x,o+x
+#     - name: Copy bin node_exporter to /usr/local/bin
+#       copy:
+#         src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+#         remote_src: yes
+#         dest: /usr/local/bin/
+#         owner: node_exporter
+#         group: node_exporter
+#         mode: u+x,g+x,o+x
 
-    - name: Create service node_exporter.service
-      blockinfile:
-        path: /etc/systemd/system/node_exporter.service
-        block: |
-          [Unit]
-          Description=Prometheus Node Exporter
-          Wants=network-online.target
-          After=network-online.target
-          [Service]
-          User=node_exporter
-          Group=node_exporter
-          Type=simple
-          ExecStart=/usr/local/bin/node_exporter
-          [Install]
-          WantedBy=multi-user.target
-        create: true
-    - name: systemctl daemon_reload
-      systemd:
-        daemon_reload: yes
+#     - name: Create service node_exporter.service
+#       blockinfile:
+#         path: /etc/systemd/system/node_exporter.service
+#         block: |
+#           [Unit]
+#           Description=Prometheus Node Exporter
+#           Wants=network-online.target
+#           After=network-online.target
+#           [Service]
+#           User=node_exporter
+#           Group=node_exporter
+#           Type=simple
+#           ExecStart=/usr/local/bin/node_exporter
+#           [Install]
+#           WantedBy=multi-user.target
+#         create: true
+#     - name: systemctl daemon_reload
+#       systemd:
+#         daemon_reload: yes
 
-    - name: Start and Enable node_exporter
-      service:
-        name: node_exporter
-        state: started
-        enabled: yes
+#     - name: Start and Enable node_exporter
+#       service:
+#         name: node_exporter
+#         state: started
+#         enabled: yes
 
-    - name: Check whether port 9100 is available
-      wait_for:
-        port: 9100
-        state: started
-        timeout: 5
+#     - name: Check whether port 9100 is available
+#       wait_for:
+#         port: 9100
+#         state: started
+#         timeout: 5
 
 - name: Install and Configure Zookeeper
   hosts: zookeepers
@@ -185,14 +168,14 @@
         zookeeper_data_dir: "/mnt/zookeeper/data"
     - set_fact:
         zid: "{{ groups['zookeepers'].index(inventory_hostname) }}"
-    - name: Remove old Zookeeper installation
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ zookeeper_install_dir }}"
-        - "/opt/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
-        - "{{ zookeeper_data_dir }}"
+    # - name: Remove old Zookeeper installation
+    #   file:
+    #     path: "{{ item }}"
+    #     state: absent
+    #   loop:
+    #     - "{{ zookeeper_install_dir }}"
+    #     - "/opt/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+    #     - "{{ zookeeper_data_dir }}"
  
     - name: Download and extract Zookeeper
       unarchive:
@@ -212,15 +195,13 @@
         - { path: "{{ zookeeper_install_dir }}", state: link, src: "/opt/apache-zookeeper-{{ zookeeper_version }}-bin" }
         - { path: "{{ zookeeper_data_dir }}", state: directory }
 
-    - name: Configure Zookeeper
-      template:
+    - template:
         src: "templates/zoo.cfg"
         dest: "{{ zookeeper_install_dir }}/conf/zoo.cfg"
-      notify: Restart Zookeeper
-      template:
+     
+    - template:
         src: templates/myid
         dest: "/mnt/zookeeper/data/myid"
-      notify: Restart Zookeeper
 
   handlers:
     - name: Restart Zookeeper
@@ -231,22 +212,22 @@
   connection: ssh
   become: yes
   tasks:
-    -set_fact:
-      bookkeeper_version: "4.17.1"
-      bookkeeper_install_dir: "/opt/bookkeeper"
-      bookkeeper_data_dirs: "/mnt/storage/0,/mnt/storage/1"
-      bookkeeper_journal_dir: "/mnt/journal/0,/mnt/journal/1"
-      zookeeperServers: "{{ groups['zookeepers'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:2181') | join(',') }}"
-      
-    - name: Remove old BookKeeper installation
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ bookkeeper_install_dir }}"
-        - "/opt/bookkeeper-server-{{ bookkeeper_version }}-bin.tar.gz"
-        - "{{ bookkeeper_journal_dir }}"
-        - "{{ bookkeeper_data_dirs[0] }}"
+    - set_fact:
+        bookkeeper_version: "4.17.1"
+        bookkeeper_install_dir: "/opt/bookkeeper"
+        bookkeeper_data_dirs: "/mnt/storage/0,/mnt/storage/1"
+        bookkeeper_journal_dir: "/mnt/journal/0,/mnt/journal/1"
+        zookeeperServers: "{{ groups['zookeepers'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:2181') | join(',') }}"
+        
+    # - name: Remove old BookKeeper installation
+    #   file:
+    #     path: "{{ item }}"
+    #     state: absent
+    #   loop:
+    #     - "{{ bookkeeper_install_dir }}"
+    #     - "/opt/bookkeeper-server-{{ bookkeeper_version }}-bin.tar.gz"
+    #     - "{{ bookkeeper_journal_dir }}"
+    #     - "{{ bookkeeper_data_dirs[0] }}"
 
     - name: Download and extract BookKeeper
       unarchive:
@@ -349,113 +330,113 @@
         executable: pip3
 
 
-- name: Prometheus installation
-  hosts: prometheus
-  connection: ssh
-  become: true
-  tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
+# - name: Prometheus installation
+#   hosts: prometheus
+#   connection: ssh
+#   become: true
+#   tasks:
+#     - name: Update apt cache
+#       apt:
+#         update_cache: yes
 
-    - name: Install dependencies
-      apt:
-        name: 
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - software-properties-common
-        state: present
+#     - name: Install dependencies
+#       apt:
+#         name: 
+#           - apt-transport-https
+#           - ca-certificates
+#           - curl
+#           - software-properties-common
+#         state: present
 
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
+#     - name: Add Docker GPG key
+#       apt_key:
+#         url: https://download.docker.com/linux/ubuntu/gpg
+#         state: present
 
-    - name: Add Docker repository
-      apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
-        state: present
+#     - name: Add Docker repository
+#       apt_repository:
+#         repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+#         state: present
 
-    - name: Install Docker
-      apt:
-        name: docker-ce
-        state: latest
+#     - name: Install Docker
+#       apt:
+#         name: docker-ce
+#         state: latest
 
-    - name: Start Docker
-      service:
-        name: docker
-        state: started
-        enabled: yes
+#     - name: Start Docker
+#       service:
+#         name: docker
+#         state: started
+#         enabled: yes
 
-    - name: Remove old Prometheus directory
-      file:
-        path: /opt/prometheus
-        state: absent
+#     - name: Remove old Prometheus directory
+#       file:
+#         path: /opt/prometheus
+#         state: absent
 
-    - name: Create Prometheus directory
-      file:
-        path: /opt/prometheus
-        state: directory
+#     - name: Create Prometheus directory
+#       file:
+#         path: /opt/prometheus
+#         state: directory
 
-    - name: Download Prometheus Binary Package
-      unarchive:
-        src: "{{ prometheus_binary.src }}"
-        remote_src: "{{ prometheus_binary.remote }}"
-        dest: /opt/prometheus
-        extra_opts: ["--strip-components=1"]
+#     - name: Download Prometheus Binary Package
+#       unarchive:
+#         src: "{{ prometheus_binary.src }}"
+#         remote_src: "{{ prometheus_binary.remote }}"
+#         dest: /opt/prometheus
+#         extra_opts: ["--strip-components=1"]
 
 
-- name: Prometheus setup
-  hosts: prometheus
-  connection: ssh
-  become: true
-  tasks:
-    - name: Remove old Pulsar directory
-      file:
-        path: /opt/pulsar
-        state: absent
+# - name: Prometheus setup
+#   hosts: prometheus
+#   connection: ssh
+#   become: true
+#   tasks:
+#     - name: Remove old Pulsar directory
+#       file:
+#         path: /opt/pulsar
+#         state: absent
 
-    - name: Create Pulsar directory
-      file:
-        path: /opt/pulsar
-        state: directory
+#     - name: Create Pulsar directory
+#       file:
+#         path: /opt/pulsar
+#         state: directory
 
-    - name: Create Prometheus data directory
-      file:
-        path: "/opt/prometheus/{{ item }}"
-        state: directory
-      with_items:
-        - data
+#     - name: Create Prometheus data directory
+#       file:
+#         path: "/opt/prometheus/{{ item }}"
+#         state: directory
+#       with_items:
+#         - data
 
-    - name: Deploy Prometheus systemd service
-      template:
-        src: "templates/prometheus.service"
-        dest: "/etc/systemd/system/prometheus.service"
+#     - name: Deploy Prometheus systemd service
+#       template:
+#         src: "templates/prometheus.service"
+#         dest: "/etc/systemd/system/prometheus.service"
 
-    - name: Deploy Pulsar Dashboard systemd service
-      template:
-        src: "templates/pulsar-dashboard.service"
-        dest: "/etc/systemd/system/pulsar-dashboard.service"
+#     - name: Deploy Pulsar Dashboard systemd service
+#       template:
+#         src: "templates/pulsar-dashboard.service"
+#         dest: "/etc/systemd/system/pulsar-dashboard.service"
 
-    - name: Deploy Prometheus configuration
-      template:
-        src: "templates/prometheus.yml"
-        dest: "/opt/prometheus/prometheus.yml"
+#     - name: Deploy Prometheus configuration
+#       template:
+#         src: "templates/prometheus.yml"
+#         dest: "/opt/prometheus/prometheus.yml"
 
-    - name: Reload systemd
-      systemd:
-        daemon_reload: yes
+#     - name: Reload systemd
+#       systemd:
+#         daemon_reload: yes
 
-    - name: Restart Prometheus service
-      systemd:
-        name: prometheus
-        state: restarted
+#     - name: Restart Prometheus service
+#       systemd:
+#         name: prometheus
+#         state: restarted
 
-    - name: Restart Bookie Dashboard service
-      systemd:
-        name: Pulsar-dashboard
-        state: restarted
+#     - name: Restart Bookie Dashboard service
+#       systemd:
+#         name: Pulsar-dashboard
+#         state: restarted
 - name: List host addresses
   hosts: localhost
   become: false
