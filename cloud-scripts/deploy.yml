@@ -205,6 +205,7 @@
 
   handlers:
     - name: Restart Zookeeper
+      become: yes
       shell: "{{ zookeeper_install_dir }}/bin/zkServer.sh restart"
 
 - name: Install and Configure BookKeeper
@@ -268,6 +269,7 @@
 
   handlers:
     - name: Restart BookKeeper
+      become: yes
       shell: "{{ bookkeeper_install_dir }}/bin/bookkeeper-daemon.sh restart bookie"
 
 - name: Chrony setup
