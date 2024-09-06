@@ -195,14 +195,18 @@
         - { path: "{{ zookeeper_install_dir }}", state: link, src: "/opt/apache-zookeeper-{{ zookeeper_version }}-bin" }
         - { path: "{{ zookeeper_data_dir }}", state: directory }
 
-    - template:
+    - name: Template Zookeeper configuration
+      template:
         src: "templates/zoo.cfg"
         dest: "{{ zookeeper_install_dir }}/conf/zoo.cfg"
-     
-    - template:
+      notify: Restart Zookeeper
+    
+    - name: Template Zookeeper myid file
+      template:
         src: templates/myid
-        dest: "/mnt/zookeeper/data/myid"
-
+        dest: "{{ zookeeper_data_dir }}/myid"
+      notify: Restart Zookeeper
+     
   handlers:
     - name: Restart Zookeeper
       become: yes
@@ -272,59 +276,60 @@
       become: yes
       shell: "{{ bookkeeper_install_dir }}/bin/bookkeeper-daemon.sh restart bookie"
 
-- name: Chrony setup
-  hosts: client
-  connection: ssh
-  become: true
-  tasks:
-    - name: Set up chronyd
-      template:
-        src: "templates/chrony.conf"
-        dest: "/etc/chrony.conf"
-    - systemd:
-        state: restarted
-        daemon_reload: yes
-        name: "chronyd"
+# - name: Chrony setup
+#   hosts: client
+#   connection: ssh
+#   become: true
+#   tasks:
+#     - name: Set up chronyd
+#       template:
+#         src: "templates/chrony.conf"
+#         dest: "/etc/chrony.conf"
+#     - systemd:
+#         state: restarted
+#         daemon_reload: yes
+#         name: "chronyd"
 
 - name: Deploy and copy Benchmark
   hosts: client-0
   connection: ssh
   become: yes
   vars:
-    remote_dir: /root/
-    # change local_dir to the correct path of lab24-log-service-benchmark
+    remote_dir: /home/ubuntu
     local_dir: /home/nati/Desktop/DMLAB/lab24-log-service-benchmark
   tasks:
-    - name: Ensure Maven is installed
+    - name: Ensure required packages are installed on the remote host
       apt:
-        name: maven
+        name: 
+          - maven
+          - rsync
+          - python3
+          - python3-pip
         state: present
+        update_cache: yes
 
     - name: Prepare benchmark directory
       file:
         path: "{{ remote_dir }}"
         state: directory
-    
-    - name: Remove existing lab24-log-service-benchmark folder if it exists
+
+    - name: Sync lab24-log-service-benchmark folder
+      synchronize:
+        src: "{{ local_dir }}/"
+        dest: "{{ remote_dir }}/lab24-log-service-benchmark"
+        delete: yes
+        recursive: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=*.pyc"
+      delegate_to: localhost
+
+
+    - name: Set correct permissions on transferred files
       file:
         path: "{{ remote_dir }}/lab24-log-service-benchmark"
-        state: absent
-    
-    - name: Copy entire lab24-log-service-benchmark folder
-      copy:
-        src: "{{ local_dir }}"
-        dest: "{{ remote_dir }}"
-        mode: u+x,g+x,o+x
-
-    - name: Install Python
-      apt:
-        name: python3
-        state: present
-
-    - name: Install pip
-      apt:
-        name: python3-pip
-        state: present
+        mode: u+rwX,g+rX,o+rX
+        recurse: yes
 
     - name: Install Python requirements
       pip:
