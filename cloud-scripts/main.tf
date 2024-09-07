@@ -46,8 +46,8 @@ provider "aws" {
    default_tags {
       tags = {
       Project = "logservice"
-}
-}
+    }
+  }
 }
 
 # Create a VPC to launch our instances into

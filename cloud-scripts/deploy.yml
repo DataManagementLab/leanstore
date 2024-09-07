@@ -19,57 +19,98 @@
           remote: yes
       when: prometheus_binary is not defined
 
+- name: ZK - Check default disk configuration
+  hosts: zookeepers
+  connection: ssh
+  become: yes
+  tasks:
+    - name: Count fstab lines
+      ansible.builtin.command: wc -l /etc/fstab
+      register: zk_fstab_line_count
+
+
 - name: Format and mount disks for Zookeeper hosts
   hosts: zookeepers
   connection: ssh
-  become: true
+  become: yes
+  vars:
+    zk_disk_format_required: zk_fstab_line_count | int > 2
   tasks:
-    - name: Unmount
-      mount:
-        path: /mnt
-        state: unmounted
-    # - name: Format disks
-    #   filesystem:
-    #     fstype: xfs
-    #     dev: '{{ item }}'
-    #     force: true
-    #   with_items:
-    #     - "/dev/xvdb"
-    #     - "/dev/xvdc"
+    - name: Remove default SSD mount config
+      shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
+      when: zk_disk_format_required
+    
+    - name: Reboot with unmounted SSDs
+      ansible.builtin.reboot:
+        reboot_timeout: 240
+      when: zk_disk_format_required
+
+    - name: Format disks
+      filesystem:
+        fstype: xfs
+        dev: '{{ item }}'
+        force: true
+      with_items:
+        - "/dev/xvdb"
+        - "/dev/xvdc"
+      when: zk_disk_format_required
+
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
         src: "{{ item.src }}"
-        fstype: ext2
+        fstype: xfs
         opts: defaults,noatime,nodiscard
         state: mounted
+      #register: mount_result
+      #until: mount_result is success
+      #retries: 10
+      #delay: 15
       with_items:
         - { path: "/mnt/zookeeper/logs", src: "/dev/xvdb" }
         - { path: "/mnt/zookeeper/data", src: "/dev/xvdc" }
 
-
-- name: Format and mount disks for Pulsar/BookKeeper hosts
+- name: BK - Check default disk configuration
   hosts: bookies
   connection: ssh
-  become: true
+  become: yes
   tasks:
-    - name: Unmount
-      mount:
-        path: /mnt
-        state: unmounted
-    # - name: Format disks
-    #   filesystem:
-    #      fstype: xfs
-    #      dev: '{{ item }}'
-    #      force: true
-    #   with_items:
-    #     - "/dev/xvdb"
-    #     - "/dev/xvdc"
+    - name: Count fstab lines
+      ansible.builtin.command: wc -l /etc/fstab
+      register: bk_fstab_line_count
+      changed_when: false
+
+- name: Format and mount disks for BookKeeper hosts
+  hosts: bookies
+  connection: ssh
+  become: yes
+  vars:
+    bk_disk_format_required: bk_fstab_line_count | int > 2
+  tasks:
+    - name: Remove default SSD mount config
+      shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
+      when: bk_disk_format_required
+    
+    - name: Reboot with unmounted SSDs
+      ansible.builtin.reboot:
+        reboot_timeout: 240
+      when: bk_disk_format_required
+
+    - name: Format disks
+      filesystem:
+         fstype: xfs
+         dev: '{{ item }}'
+         force: true
+      with_items:
+        - "/dev/xvdb"
+        - "/dev/xvdc"
+      when: bk_disk_format_required
+    
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
         src: "{{ item.src }}"
-        fstype: ext2
+        fstype: xfs
         opts: defaults,noatime,nodiscard
         state: mounted
       with_items:
@@ -296,7 +337,7 @@
   become: yes
   vars:
     remote_dir: /home/ubuntu
-    local_dir: /home/nati/Desktop/DMLAB/lab24-log-service-benchmark
+    local_dir: ./synth-bench
   tasks:
     - name: Ensure required packages are installed on the remote host
       apt:

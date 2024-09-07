@@ -25,3 +25,4 @@ cloud-scripts/terraform.tfstate
 cloud-scripts/terraform.tfstate.backup
 cloud-scripts/.terraform/
 
+cloud-scripts/synth-bench
