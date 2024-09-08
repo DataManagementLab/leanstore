@@ -331,52 +331,54 @@
 #         daemon_reload: yes
 #         name: "chronyd"
 
-- name: Deploy and copy Benchmark
+- name: Install Synthetic Benchmark
   hosts: client-0
   connection: ssh
   become: yes
   vars:
-    remote_dir: /home/ubuntu
-    local_dir: ./synth-bench
+    benchmark_dir: /opt/bench-main
   tasks:
     - name: Ensure required packages are installed on the remote host
       apt:
         name: 
-          - maven
-          - rsync
+          #- maven
+          - unzip
           - python3
           - python3-pip
         state: present
         update_cache: yes
+      tags:
+        - client-install
 
-    - name: Prepare benchmark directory
-      file:
-        path: "{{ remote_dir }}"
-        state: directory
-
-    - name: Sync lab24-log-service-benchmark folder
-      synchronize:
-        src: "{{ local_dir }}/"
-        dest: "{{ remote_dir }}/lab24-log-service-benchmark"
-        delete: yes
-        recursive: yes
-        rsync_opts:
-          - "--exclude=.git"
-          - "--exclude=*.pyc"
-      delegate_to: localhost
-
+    - name: Remove existing benchmark installation
+      ansible.builtin.file:
+        path: "{{ benchmark_dir }}"
+        state: absent
+      tags:
+        - client-install
+      
+    - name: Download and extract synthetic benchmark
+      unarchive:
+        src: "https://github.com/rzepkamichal/bench/archive/refs/heads/main.zip"
+        remote_src: yes
+        dest: "/opt"
+      tags:
+        - client-install
 
     - name: Set correct permissions on transferred files
       file:
-        path: "{{ remote_dir }}/lab24-log-service-benchmark"
+        path: "{{ benchmark_dir }}"
         mode: u+rwX,g+rX,o+rX
         recurse: yes
+      tags:
+        - client-install
 
     - name: Install Python requirements
       pip:
-        requirements: "{{ remote_dir }}/lab24-log-service-benchmark/experiment-runner/src/requirements.txt"
+        requirements: "{{ benchmark_dir }}/experiment-runner/requirements.txt"
         executable: pip3
-
+      tags:
+        - client-install
 
 # - name: Prometheus installation
 #   hosts: prometheus
