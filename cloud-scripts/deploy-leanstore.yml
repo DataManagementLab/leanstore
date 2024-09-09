@@ -1,20 +1,15 @@
 ---
-- name: Set up LeanStore environment and compile
+- name: Install LeanStore
   hosts: client-0
+  connection: ssh
   become: yes
   vars:
-    java_home: /usr/lib/jvm/java-17-openjdk-amd64
-    local_leanstore_dir: /home/nati/Desktop/DMLAB/temp/leanstore #/path/to/your/local/leanstore  # Update this
-    remote_leanstore_dir: /opt/leanstore
-
+    leanstore_dir: /opt/leanstore
+    leanstore_zip_url: https://github.com/DataManagementLab/leanstore/archive/refs/heads/bookkeeper-integration.zip
   tasks:
-    - name: Update apt cache
+    - name: Ensure required packages are installed on the remote host
       apt:
-        update_cache: yes
-
-    - name: Install dependencies
-      apt:
-        name:
+        name: 
           - cmake
           - libtbb2-dev
           - libaio-dev
@@ -30,62 +25,45 @@
           - openjdk-17-jdk
           - maven
           - clang-14
-          - rsync
+          - unzip
         state: present
+        update_cache: yes
 
-    - name: Set JAVA_HOME
-      lineinfile:
-        path: /etc/environment
-        line: "JAVA_HOME={{ java_home }}"
+    - name: Remove existing LeanStore installation
+      ansible.builtin.file:
+        path: "{{ leanstore_dir }}"
+        state: absent
 
-    - name: Set CXX to clang++-14
-      lineinfile:
-        path: /etc/environment
-        line: "CXX=clang++-14"
+    - name: Download and extract LeanStore
+      unarchive:
+        src: "{{ leanstore_zip_url }}"
+        remote_src: yes
+        dest: "/opt"
+        creates: "{{ leanstore_dir }}"
+     
+    - name: Rename extracted directory
+      command: mv /opt/leanstore-bookkeeper-integration {{ leanstore_dir }}
+      args:
+        creates: "{{ leanstore_dir }}"
 
-    - name: Create LeanStore directory
+    - name: Set correct permissions on transferred files
       file:
-        path: "{{ remote_leanstore_dir }}"
-        state: directory
-
-    - name: Synchronize LeanStore files from local to remote
-      synchronize:
-        src: "{{ local_leanstore_dir }}/"
-        dest: "{{ remote_leanstore_dir }}"
-        delete: yes
-        recursive: yes
-        rsync_opts:
-          - "--exclude=.git"
-      delegate_to: localhost
-
-    - name: Ensure correct permissions
-      file:
-        path: "{{ remote_leanstore_dir }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        path: "{{ leanstore_dir }}"
+        mode: u+rwX,g+rX,o+rX
         recurse: yes
 
     - name: Compile Java wrapper and LeanStore
       shell: |
-        source /etc/environment
-        cd {{ remote_leanstore_dir }}/bookkeeper-helper && mvn package
-        cd {{ remote_leanstore_dir }} && mkdir -p build && cd build
+        cd {{ leanstore_dir }}/bookkeeper-helper && mvn package
+        cd {{ leanstore_dir }} && mkdir -p build && cd build
         cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
         make tpcc
       environment:
-        JAVA_HOME: "{{ java_home }}"
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         CXX: clang++-14
-
-    - name: Create leanstore file
-      file:
-        path: "{{ remote_leanstore_dir }}/leanstore"
-        state: touch
 
     - name: Set execute permissions for tpcc binary
       file:
-        path: "{{ remote_leanstore_dir }}/build/frontend/tpcc"
+        path: "{{ leanstore_dir }}/build/frontend/tpcc"
         mode: u+x,g+x,o+x
-
-    - name: Print completion message
-      debug:
-        msg: "LeanStore has been set up, compiled, and the TPC-C benchmark is ready to run."
+    
