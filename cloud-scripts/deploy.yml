@@ -132,6 +132,8 @@
           - tar
           - vim
           - chrony
+          - dstat
+          - iotop
         state: present
         update_cache: yes
     - name: Change locale to en_US.utf-8
