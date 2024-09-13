@@ -22,7 +22,6 @@ services:
       BK_zkServers: zookeeper:2181
       BK_enableStatistics: true
       BK_statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
-      BK_byteBufAllocatorSizeMax: 20482258
       BK_nettyMaxFrameSizeBytes: 15482258
   bookie-02:
     image: apache/bookkeeper:latest
@@ -40,7 +39,6 @@ services:
       BK_zkServers: zookeeper:2181
       BK_enableStatistics: true
       BK_statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
-      BK_byteBufAllocatorSizeMax: 20482258
       BK_nettyMaxFrameSizeBytes: 15482258
   bookie-03:
     image: apache/bookkeeper:latest
@@ -58,7 +56,6 @@ services:
       BK_zkServers: zookeeper:2181
       BK_enableStatistics: true
       BK_statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
-      BK_byteBufAllocatorSizeMax: 20482258
       BK_nettyMaxFrameSizeBytes: 15482258
 
 networks:
