@@ -1,0 +1,20 @@
+binary_path: ../../build/frontend/tpcc
+repetitions: 1
+flags:
+  tpcc_warehouse_count: 1
+  notpcc_warehouse_affinity: true
+  contention_split: true
+  xmerge: true
+  profile_latency: true
+  pp_threads: 4
+  free_pct: 1
+  warmup_for_seconds: 5
+  run_for_seconds: 60
+  isolation_level: si
+  wal_pwrite: true
+  wal_variant: 0
+  bookkeeper_jar_directories: ../../bookkeeper-helper/target:../../bookkeeper-helper/target/maven-dependencies
+tasks:
+  worker_threads_1:
+    flags:
+      worker_threads: 1
