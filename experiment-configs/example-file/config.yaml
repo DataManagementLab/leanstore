@@ -1,0 +1,25 @@
+binary_path: ../../build/frontend/tpcc
+repetitions: 1
+flags:
+  contention_split: true
+  dram_gib: 16
+  free_pct: 1
+  isolation_level: si
+  notpcc_warehouse_affinity: true
+  pp_threads: 4
+  print_tx_console: true
+  profile_latency: true
+  run_for_seconds: 120
+  ssd_gib: 100
+  ssd_path: leanstore
+  tpcc_warehouse_count: 100
+  wal_fsync: true
+  wal_offset_gib: 20
+  wal_pwrite: true
+  wal_variant: 0
+  warmup_for_seconds: 5
+  xmerge: true
+tasks:
+  worker_threads_8:
+    flags:
+      worker_threads: 8

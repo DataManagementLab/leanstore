@@ -19,10 +19,17 @@ class TPCCExperiment(BaseModel):
     tasks: Dict[str, TPCCArgs]
 
 
-def build_flags(flags: Dict[str, Any], csv_path: str) -> str:
-    flats_list = [f"--{k}={v}" for k, v in flags.items()]
-    flats_list.append(f"--csv_path={csv_path}")
-    return " ".join(flats_list)
+def build_cmd(binary_path: str, flags: Dict[str, Any]) -> str:
+    flags_list = [binary_path]
+    for k, v in flags.items():
+        if type(v) is bool:
+            if v:
+                flags_list.append(f"--{k}=true")
+            else:
+                flags_list.append(f"--{k}=false")
+        else:
+            flags_list.append(f"--{k}={v}")
+    return flags_list
 
 
 def run_experiment(
@@ -39,11 +46,10 @@ def run_experiment(
     for task_name, task_args in experiment.tasks.items():
         task_flags = experiment.flags.copy()
         task_flags.update(task_args.flags)
+        task_flags["csv_path"] = os.path.join(results_dir_name, f"{task_name}")
 
-        cmd_flags = build_flags(
-            task_flags, os.path.join(results_dir_name, f"{task_name}")
-        )
-        cmd = f"{experiment.binary_path} {cmd_flags}"
+        cmd = build_cmd(experiment.binary_path, task_flags)
+        print(" ".join(cmd))
 
         stdout_file_name = os.path.join(results_dir_name, f"{task_name}_stdout.txt")
         stderr_file_name = os.path.join(results_dir_name, f"{task_name}_stderr.txt")
@@ -51,8 +57,8 @@ def run_experiment(
             open(stdout_file_name, "w") as stdout,
             open(stderr_file_name, "w") as stderr,
         ):
-            open("./leanstore", mode='w').close()
-            subprocess.run(cmd, shell=True, stdout=stdout, stderr=stderr)
+            open("./leanstore", mode="w").close()
+            subprocess.run(cmd, stdout=stdout, stderr=stderr)
 
 
 if __name__ == "__main__":
