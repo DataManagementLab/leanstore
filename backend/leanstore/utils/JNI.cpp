@@ -25,6 +25,8 @@ namespace bookkeeper
 static jclass jc_ClientConfiguration;
 static jmethodID jm_ClientConfiguration_init;
 static jmethodID jm_ClientConfiguration_setMetadataServiceUri;
+static jmethodID jm_ClientConfiguration_setAddEntryTimeout;
+static jmethodID jm_ClientConfiguration_setReadEntryTimeout;
 
 static jclass jc_DigestType;
 static jfieldID jf_DigestType_CRC32;
@@ -152,6 +154,10 @@ static void loadClassAndMethodReferences(JNIEnv* env)
       bookkeeper::jm_ClientConfiguration_init = mustGetMethodID(env, bookkeeper::jc_ClientConfiguration, "<init>", "()V");
       bookkeeper::jm_ClientConfiguration_setMetadataServiceUri = mustGetMethodID(
           env, bookkeeper::jc_ClientConfiguration, "setMetadataServiceUri", "(Ljava/lang/String;)Lorg/apache/bookkeeper/conf/AbstractConfiguration;");
+      bookkeeper::jm_ClientConfiguration_setAddEntryTimeout =
+          mustGetMethodID(env, bookkeeper::jc_ClientConfiguration, "setAddEntryTimeout", "(I)Lorg/apache/bookkeeper/conf/ClientConfiguration;");
+      bookkeeper::jm_ClientConfiguration_setReadEntryTimeout =
+          mustGetMethodID(env, bookkeeper::jc_ClientConfiguration, "setReadEntryTimeout", "(I)Lorg/apache/bookkeeper/conf/ClientConfiguration;");
       env->DeleteLocalRef(clazz);
    }
    // Load and cache org.apache.bookkeeper.client.BookKeeper.DigestType.
@@ -354,6 +360,22 @@ bookkeeper::LocalClientConfiguration& bookkeeper::LocalClientConfiguration::setM
    env->CallNonvirtualObjectMethod(getJObject(ref), bookkeeper::jc_ClientConfiguration, bookkeeper::jm_ClientConfiguration_setMetadataServiceUri,
                                    uri_jstring);
    env->DeleteLocalRef(uri_jstring);
+   return *this;
+}
+
+bookkeeper::LocalClientConfiguration& bookkeeper::LocalClientConfiguration::setAddEntryTimeout(int timeout)
+{
+   JNIEnv* env = jni::JVM_REF->getEnv();
+   env->CallNonvirtualObjectMethod(getJObject(ref), bookkeeper::jc_ClientConfiguration, bookkeeper::jm_ClientConfiguration_setAddEntryTimeout,
+                                   timeout);
+   return *this;
+}
+
+bookkeeper::LocalClientConfiguration& bookkeeper::LocalClientConfiguration::setReadEntryTimeout(int timeout)
+{
+   JNIEnv* env = jni::JVM_REF->getEnv();
+   env->CallNonvirtualObjectMethod(getJObject(ref), bookkeeper::jc_ClientConfiguration, bookkeeper::jm_ClientConfiguration_setReadEntryTimeout,
+                                   timeout);
    return *this;
 }
 

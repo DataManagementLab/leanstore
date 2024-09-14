@@ -76,6 +76,8 @@ class LocalClientConfiguration
    jni::LocalRef ref;
    LocalClientConfiguration();
    LocalClientConfiguration& setMetadataServiceUri(std::string&);
+   LocalClientConfiguration& setAddEntryTimeout(int);
+   LocalClientConfiguration& setReadEntryTimeout(int);
 };
 
 class LocalDigestType
