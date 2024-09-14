@@ -83,6 +83,8 @@ DECLARE_string(bookkeeper_jar_directories);
 DECLARE_string(bookkeeper_metadata_uri);
 DECLARE_int32(bookkeeper_ensemble);
 DECLARE_int32(bookkeeper_quorum);
+DECLARE_int32(bookkeeper_add_timeout);
+DECLARE_int32(bookkeeper_read_timeout);
 // -------------------------------------------------------------------------------------
 DECLARE_string(isolation_level);
 DECLARE_bool(mv);

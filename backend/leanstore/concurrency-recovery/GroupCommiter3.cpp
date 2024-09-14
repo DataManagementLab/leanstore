@@ -22,8 +22,8 @@ void CRManager::groupCommiter3()
    {
       bookkeeper::LocalClientConfiguration client_configuration;
       client_configuration.setMetadataServiceUri(FLAGS_bookkeeper_metadata_uri);
-      client_configuration.setAddEntryTimeout(0);
-      client_configuration.setReadEntryTimeout(0);
+      client_configuration.setAddEntryTimeout(FLAGS_bookkeeper_add_timeout);
+      client_configuration.setReadEntryTimeout(FLAGS_bookkeeper_read_timeout);
       bookkeeper::GlobalBookKeeper bookkeeper(std::move(client_configuration));
 
       bookkeeper::LocalDigestType digest = bookkeeper::LocalDigestType::DUMMY();

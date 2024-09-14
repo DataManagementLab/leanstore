@@ -91,6 +91,8 @@ DEFINE_string(bookkeeper_jar_directories,
 DEFINE_string(bookkeeper_metadata_uri, "zk+hierarchical://localhost:2181/ledgers", "URI to BookKeeper's metadata service");
 DEFINE_int32(bookkeeper_ensemble, 3, "BookKeeper ledger ensemble size");
 DEFINE_int32(bookkeeper_quorum, 3, "BookKeeper ledger quorum size");
+DEFINE_int32(bookkeeper_add_timeout, 5000, "BookKeeper add entry timeout in milliseconds");
+DEFINE_int32(bookkeeper_read_timeout, 5000, "BookKeeper read entry timeout in milliseconds");
 // -------------------------------------------------------------------------------------
 DEFINE_string(isolation_level, "si", "options: ru (READ_UNCOMMITTED), rc (READ_COMMITTED), si (SNAPSHOT_ISOLATION), ser (SERIALIZABLE)");
 DEFINE_bool(mv, true, "Multi-version");
