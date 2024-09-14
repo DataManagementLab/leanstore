@@ -18,11 +18,10 @@ services:
       - zookeeper
     depends_on:
       - zookeeper
+    volumes:
+      - ./bookkeeper-conf/bk_server.conf:/opt/bookkeeper/conf/bk_server.conf:ro
     environment:
       BK_zkServers: zookeeper:2181
-      BK_enableStatistics: true
-      BK_statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
-      BK_nettyMaxFrameSizeBytes: 15482258
   bookie-02:
     image: apache/bookkeeper:latest
     restart: always
@@ -35,11 +34,10 @@ services:
       - zookeeper
     depends_on:
       - zookeeper
+    volumes:
+      - ./bookkeeper-conf/bk_server.conf:/opt/bookkeeper/conf/bk_server.conf:ro
     environment:
       BK_zkServers: zookeeper:2181
-      BK_enableStatistics: true
-      BK_statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
-      BK_nettyMaxFrameSizeBytes: 15482258
   bookie-03:
     image: apache/bookkeeper:latest
     restart: always
@@ -52,11 +50,10 @@ services:
       - zookeeper
     depends_on:
       - zookeeper
+    volumes:
+      - ./bookkeeper-conf/bk_server.conf:/opt/bookkeeper/conf/bk_server.conf:ro
     environment:
       BK_zkServers: zookeeper:2181
-      BK_enableStatistics: true
-      BK_statsProviderClass: org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
-      BK_nettyMaxFrameSizeBytes: 15482258
 
 networks:
   bookkeeper-internal:
