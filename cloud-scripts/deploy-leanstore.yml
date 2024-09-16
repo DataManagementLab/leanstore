@@ -40,7 +40,7 @@
         remote_src: yes
         dest: "/opt"
         creates: "{{ leanstore_dir }}"
-     
+
     - name: Rename extracted directory
       command: mv /opt/leanstore-bookkeeper-integration {{ leanstore_dir }}
       args:
@@ -66,4 +66,4 @@
       file:
         path: "{{ leanstore_dir }}/build/frontend/tpcc"
         mode: u+x,g+x,o+x
-    
+

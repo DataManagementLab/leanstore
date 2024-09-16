@@ -17,7 +17,7 @@
         - "{{ zookeeper_install_dir }}"
         - "/opt/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
         - "{{ zookeeper_data_dir }}"
-    
+
     - name: Install dependencies
       apt:
         name: 
@@ -83,7 +83,7 @@
         - "/opt/bookkeeper-server-{{ bookkeeper_version }}-bin.tar.gz"
         - "{{ bookkeeper_journal_dir }}"
         - "{{ bookkeeper_data_dirs[0] }}"
-    
+
     - name: Install dependencies
       apt:
         name: 
@@ -160,12 +160,12 @@
       file:
         path: "{{ remote_dir }}"
         state: directory
-    
+
     - name: Remove existing lab24-log-service-benchmark folder if it exists
       file:
         path: "{{ remote_dir }}/lab24-log-service-benchmark"
         state: absent
-    
+
     - name: Copy entire lab24-log-service-benchmark folder
       copy:
         src: "{{ local_dir }}"

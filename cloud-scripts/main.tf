@@ -148,7 +148,7 @@ resource "aws_instance" "zookeeper" {
          }
        }
    }
-  
+
   tags = {
     Name = "zk-${count.index}"
   }

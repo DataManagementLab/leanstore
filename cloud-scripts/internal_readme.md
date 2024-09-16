@@ -52,7 +52,7 @@ terraform apply
 6. Run ansible script to setup the machines. The IPs (inventory) are obtained from the terraform project via the terraform plugin for ansible. 
 
     6.1 install rsync on local machine and do sudo update before running the ansible-playbook 
-    
+
 ```
 ansible-playbook --user ubuntu --inventory terraform.yaml deploy.yml
 ```
