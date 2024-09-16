@@ -52,13 +52,16 @@ def run_experiment(
         print(" ".join(cmd))
 
         stdout_file_name = os.path.join(results_dir_name, f"{task_name}_stdout.txt")
-        stderr_file_name = os.path.join(results_dir_name, f"{task_name}_stderr.txt")
-        with (
-            open(stdout_file_name, "w") as stdout,
-            open(stderr_file_name, "w") as stderr,
-        ):
+        with open(stdout_file_name, "w") as f:
             open("./leanstore", mode="w").close()
-            subprocess.run(cmd, stdout=stdout, stderr=stderr)
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            )
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                f.write(line)
+
+            proc.wait()
 
 
 if __name__ == "__main__":

@@ -6,15 +6,13 @@ flags:
   free_pct: 1
   isolation_level: si
   notpcc_warehouse_affinity: true
-  pp_threads: 4
   print_tx_console: true
   profile_latency: true
   run_for_seconds: 120
   ssd_gib: 100
   ssd_path: leanstore
-  tpcc_warehouse_count: 100
+  tpcc_warehouse_count: 1
   wal_fsync: true
-  wal_offset_gib: 20
   wal_pwrite: true
   wal_variant: 0
   warmup_for_seconds: 5
