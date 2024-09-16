@@ -200,29 +200,6 @@ resource "aws_instance" "client" {
   }
 }
 
-resource "aws_instance" "prometheus" {
-  ami           = var.ami
-  instance_type = var.instance_types["prometheus"]
-  key_name      = aws_key_pair.auth.id
-  subnet_id     = aws_subnet.benchmark_subnet.id
-  vpc_security_group_ids = [
-  aws_security_group.benchmark_security_group.id]
-  count = var.num_instances["prometheus"]
-  dynamic "instance_market_options" {
-     for_each = var.spot ? [1] : []
-     content {
-         market_type = "spot"
-         spot_options {
-           max_price = 0.09
-         }
-     }
-  }
-
-  tags = {
-    Name = "prometheus-${count.index}"
-  }
-}
-
 # Inventory host resource.
 resource "ansible_host" "zookeeper" {
   name = "zk-${count.index}"
@@ -250,6 +227,7 @@ resource "ansible_host" "bookie" {
     # Custom vars that we might use in roles/tasks.
   }
 }
+
 resource "ansible_host" "client" {
   name = "client-${count.index}"
   groups = ["clients"] # Groups this host is part of.
@@ -259,19 +237,6 @@ resource "ansible_host" "client" {
     # Connection vars.
     ansible_user = "ubuntu" # Default user depends on the OS.
     ansible_host = aws_instance.client[count.index].public_ip
-
-    # Custom vars that we might use in roles/tasks.
-  }
-}
-resource "ansible_host" "prometheus" {
-  name = "prometheus-${count.index}"
-  groups = ["prometheus"] # Groups this host is part of.
-  count = var.num_instances["prometheus"]
-
-  variables = {
-    # Connection vars.
-    ansible_user = "ubuntu" # Default user depends on the OS.
-    ansible_host = aws_instance.prometheus[count.index].public_ip
 
     # Custom vars that we might use in roles/tasks.
   }
@@ -298,17 +263,7 @@ output "client" {
   }
 }
 
-output "prometheus" {
-  value = {
-    for instance in aws_instance.prometheus :
-    instance.public_ip => instance.private_ip
-  }
-}
-
 output "client_ssh_host" {
   value = aws_instance.client.0.public_ip
 }
 
-output "prometheus_host" {
-  value = aws_instance.prometheus.0.public_ip
-}

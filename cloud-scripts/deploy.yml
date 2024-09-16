@@ -5,19 +5,6 @@
   tasks:
     - set_fact:
         private_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
-    - set_fact:
-        node_exporter_version: "{{ node_exporter_version | default('1.2.2') }}"
-        prometheus_version: "{{ prometheus_version | default('2.31.1') }}"
-    - set_fact:
-        node_exporter_binary:
-          src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-          remote: yes
-      when: node_exporter_binary is not defined
-    - set_fact:
-        prometheus_binary:
-          src: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
-          remote: yes
-      when: prometheus_binary is not defined
 
 - name: ZK - Check default disk configuration
   hosts: zookeepers
@@ -39,7 +26,7 @@
     - name: Remove default SSD mount config
       shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
       when: zk_disk_format_required
-    
+
     - name: Reboot with unmounted SSDs
       ansible.builtin.reboot:
         reboot_timeout: 240
@@ -90,7 +77,7 @@
     - name: Remove default SSD mount config
       shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
       when: bk_disk_format_required
-    
+
     - name: Reboot with unmounted SSDs
       ansible.builtin.reboot:
         reboot_timeout: 240
@@ -105,7 +92,7 @@
         - "/dev/xvdb"
         - "/dev/xvdc"
       when: bk_disk_format_required
-    
+
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
@@ -140,65 +127,6 @@
       shell: |
         echo 'LANG=en_US.utf-8
           LC_ALL=en_US.utf-8' > /etc/environment
-
-
-
-# - name: Install Node exporter on Brokers to collect system metrics
-#   hosts: bookies
-#   become: true
-#   tasks:
-#     - name: Add user node_exporter
-#       user:
-#         name: node_exporter
-#         shell: /bin/false
-#         system: true
-#         create_home: no
-#     - name: Download and extract
-#       unarchive:
-#         src: "{{ node_exporter_binary.src }}"
-#         dest: /tmp
-#         remote_src: "{{ node_exporter_binary.remote }}"
-
-#     - name: Copy bin node_exporter to /usr/local/bin
-#       copy:
-#         src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
-#         remote_src: yes
-#         dest: /usr/local/bin/
-#         owner: node_exporter
-#         group: node_exporter
-#         mode: u+x,g+x,o+x
-
-#     - name: Create service node_exporter.service
-#       blockinfile:
-#         path: /etc/systemd/system/node_exporter.service
-#         block: |
-#           [Unit]
-#           Description=Prometheus Node Exporter
-#           Wants=network-online.target
-#           After=network-online.target
-#           [Service]
-#           User=node_exporter
-#           Group=node_exporter
-#           Type=simple
-#           ExecStart=/usr/local/bin/node_exporter
-#           [Install]
-#           WantedBy=multi-user.target
-#         create: true
-#     - name: systemctl daemon_reload
-#       systemd:
-#         daemon_reload: yes
-
-#     - name: Start and Enable node_exporter
-#       service:
-#         name: node_exporter
-#         state: started
-#         enabled: yes
-
-#     - name: Check whether port 9100 is available
-#       wait_for:
-#         port: 9100
-#         state: started
-#         timeout: 5
 
 - name: Install and Configure Zookeeper
   hosts: zookeepers
@@ -243,13 +171,13 @@
         src: "templates/zoo.cfg"
         dest: "{{ zookeeper_install_dir }}/conf/zoo.cfg"
       notify: Restart Zookeeper
-    
+
     - name: Template Zookeeper myid file
       template:
         src: templates/myid
         dest: "{{ zookeeper_data_dir }}/myid"
       notify: Restart Zookeeper
-     
+
   handlers:
     - name: Restart Zookeeper
       become: yes
@@ -266,7 +194,7 @@
         bookkeeper_data_dirs: "/mnt/storage/0,/mnt/storage/1"
         bookkeeper_journal_dir: "/mnt/journal/0,/mnt/journal/1"
         zookeeperServers: "{{ groups['zookeepers'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:2181') | join(',') }}"
-        
+
     # - name: Remove old BookKeeper installation
     #   file:
     #     path: "{{ item }}"
@@ -358,7 +286,7 @@
         state: absent
       tags:
         - client-install
-      
+
     - name: Download and extract synthetic benchmark
       unarchive:
         src: "https://github.com/rzepkamichal/bench/archive/refs/heads/main.zip"
@@ -382,113 +310,6 @@
       tags:
         - client-install
 
-# - name: Prometheus installation
-#   hosts: prometheus
-#   connection: ssh
-#   become: true
-#   tasks:
-#     - name: Update apt cache
-#       apt:
-#         update_cache: yes
-
-#     - name: Install dependencies
-#       apt:
-#         name: 
-#           - apt-transport-https
-#           - ca-certificates
-#           - curl
-#           - software-properties-common
-#         state: present
-
-#     - name: Add Docker GPG key
-#       apt_key:
-#         url: https://download.docker.com/linux/ubuntu/gpg
-#         state: present
-
-#     - name: Add Docker repository
-#       apt_repository:
-#         repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
-#         state: present
-
-#     - name: Install Docker
-#       apt:
-#         name: docker-ce
-#         state: latest
-
-#     - name: Start Docker
-#       service:
-#         name: docker
-#         state: started
-#         enabled: yes
-
-#     - name: Remove old Prometheus directory
-#       file:
-#         path: /opt/prometheus
-#         state: absent
-
-#     - name: Create Prometheus directory
-#       file:
-#         path: /opt/prometheus
-#         state: directory
-
-#     - name: Download Prometheus Binary Package
-#       unarchive:
-#         src: "{{ prometheus_binary.src }}"
-#         remote_src: "{{ prometheus_binary.remote }}"
-#         dest: /opt/prometheus
-#         extra_opts: ["--strip-components=1"]
-
-
-# - name: Prometheus setup
-#   hosts: prometheus
-#   connection: ssh
-#   become: true
-#   tasks:
-#     - name: Remove old Pulsar directory
-#       file:
-#         path: /opt/pulsar
-#         state: absent
-
-#     - name: Create Pulsar directory
-#       file:
-#         path: /opt/pulsar
-#         state: directory
-
-#     - name: Create Prometheus data directory
-#       file:
-#         path: "/opt/prometheus/{{ item }}"
-#         state: directory
-#       with_items:
-#         - data
-
-#     - name: Deploy Prometheus systemd service
-#       template:
-#         src: "templates/prometheus.service"
-#         dest: "/etc/systemd/system/prometheus.service"
-
-#     - name: Deploy Pulsar Dashboard systemd service
-#       template:
-#         src: "templates/pulsar-dashboard.service"
-#         dest: "/etc/systemd/system/pulsar-dashboard.service"
-
-#     - name: Deploy Prometheus configuration
-#       template:
-#         src: "templates/prometheus.yml"
-#         dest: "/opt/prometheus/prometheus.yml"
-
-#     - name: Reload systemd
-#       systemd:
-#         daemon_reload: yes
-
-#     - name: Restart Prometheus service
-#       systemd:
-#         name: prometheus
-#         state: restarted
-
-#     - name: Restart Bookie Dashboard service
-#       systemd:
-#         name: Pulsar-dashboard
-#         state: restarted
 - name: List host addresses
   hosts: localhost
   become: false
@@ -502,6 +323,3 @@
     - debug:
         msg: "Benchmark clients {{ item }}"
       with_items: "{{ groups['clients'] }}"
-    - debug:
-        msg: "Prometheus servers {{ item }}"
-      with_items: "{{ groups['prometheus'] }}"
