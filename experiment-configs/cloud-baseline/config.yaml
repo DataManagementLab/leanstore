@@ -1,0 +1,61 @@
+binary_path: ../../build/frontend/tpcc
+repetitions: 1
+flags:
+  contention_split: true
+  dram_gib: 20
+  free_pct: 1
+  isolation_level: si
+  notpcc_warehouse_affinity: true
+  print_tx_console: true
+  profile_latency: true
+  run_for_seconds: 120
+  ssd_gib: 100
+  ssd_path: leanstore
+  tpcc_warehouse_count: 100
+  wal_fsync: true
+  wal_offset_gib: 20
+  wal_pwrite: true
+  wal_variant: 0
+  warmup_for_seconds: 5
+  xmerge: true
+tasks:
+  worker_threads_1:
+    flags:
+      worker_threads: 1
+  worker_threads_10:
+    flags:
+      worker_threads: 10
+  worker_threads_20:
+    flags:
+      worker_threads: 20
+  worker_threads_30:
+    flags:
+      worker_threads: 30
+  worker_threads_40:
+    flags:
+      worker_threads: 40
+  worker_threads_50:
+    flags:
+      worker_threads: 50
+  worker_threads_60:
+    flags:
+      worker_threads: 60
+  worker_threads_70:
+    flags:
+      worker_threads: 70
+  worker_threads_80:
+    flags:
+      worker_threads: 80
+  worker_threads_90:
+    flags:
+      worker_threads: 90
+  worker_threads_100:
+    flags:
+      worker_threads: 100
+  worker_threads_110:
+    flags:
+      worker_threads: 110
+  worker_threads_120:
+    flags:
+      worker_threads: 120
+
