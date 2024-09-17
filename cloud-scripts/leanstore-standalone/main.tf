@@ -144,7 +144,7 @@ resource "aws_instance" "client" {
      content {
          market_type = "spot"
          spot_options {
-           max_price = 0.9
+           max_price = 1.0474
          }
      }
   }

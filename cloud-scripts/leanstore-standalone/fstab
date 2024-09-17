@@ -1,0 +1,7 @@
+LABEL=cloudimg-rootfs   /        ext4   discard,errors=remount-ro       0 1
+LABEL=UEFI      /boot/efi       vfat    umask=0077      0 1
+/dev/xvdb /mnt/journal ext2 defaults,noatime,nodiscard 0 0
+/dev/xvdc /mnt/storage ext2 defaults,noatime,nodiscard 0 0
+
+
+sudo head -n -1 /etc/fstab > tempfile && sudo mv tempfile /etc/fstab

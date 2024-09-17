@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Self
+from typing import Any, Dict
 from pydantic import BaseModel
 
 import yaml
@@ -53,7 +53,11 @@ def run_experiment(
 
         stdout_file_name = os.path.join(results_dir_name, f"{task_name}_stdout.txt")
         with open(stdout_file_name, "w") as f:
-            open("./leanstore", mode="w").close()
+            if task_flags["ssd_path"] is None:
+                open("./leanstore", mode="w").close()
+            else:
+                open(task_flags["ssd_path"], mode="w").close()
+
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
             )

@@ -1,0 +1,126 @@
+---
+- name: Client - Check default disk configuration
+  hosts: client-0
+  connection: ssh
+  become: yes
+  tasks:
+    - name: Count fstab lines
+      ansible.builtin.command: wc -l /etc/fstab
+      register: bk_fstab_line_count
+      changed_when: false
+
+- name: Format and mount disks for client host
+  hosts: client-0
+  connection: ssh
+  become: yes
+  vars:
+    bk_disk_format_required: bk_fstab_line_count | int > 2
+  tasks:
+    # - name: Remove default SSD mount config
+    #   shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
+    #   when: bk_disk_format_required
+
+    # - name: Reboot with unmounted SSDs
+    #   ansible.builtin.reboot:
+    #     reboot_timeout: 240
+    #   when: bk_disk_format_required
+
+    - name: Format disks
+      filesystem:
+         fstype: xfs
+         dev: '{{ item }}'
+         force: true
+      with_items:
+        - "/dev/nvme1n1"
+        - "/dev/nvme2n1"
+      # when: bk_disk_format_required
+
+    - name: Mount disks
+      mount:
+        path: "{{ item.path }}"
+        src: "{{ item.src }}"
+        fstype: xfs
+        opts: defaults,noatime,nodiscard
+        state: mounted
+      with_items:
+        - { path: "/mnt/nvme1n1", src: "/dev/nvme1n1" }
+        - { path: "/mnt/nvme2n1", src: "/dev/nvme2n1" }
+
+- name: Install LeanStore
+  hosts: client-0
+  connection: ssh
+  become: yes
+  vars:
+    leanstore_dir: /opt/leanstore
+    leanstore_zip_url: https://github.com/DataManagementLab/leanstore/archive/refs/heads/bookkeeper-integration.zip
+  tasks:
+    - name: Ensure required packages are installed on the remote host
+      apt:
+        name: 
+          - cmake
+          - libtbb2-dev
+          - libaio-dev
+          - libsnappy-dev
+          - zlib1g-dev
+          - libbz2-dev
+          - liblz4-dev
+          - libzstd-dev
+          - librocksdb-dev
+          - liblmdb-dev
+          - libwiredtiger-dev
+          - liburing-dev
+          - openjdk-17-jdk
+          - maven
+          - clang-14
+          - unzip
+          - dstat
+          - python3
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Remove existing LeanStore installation
+      ansible.builtin.file:
+        path: "{{ leanstore_dir }}"
+        state: absent
+
+    - name: Download and extract LeanStore
+      unarchive:
+        src: "{{ leanstore_zip_url }}"
+        remote_src: yes
+        dest: "/opt"
+        creates: "{{ leanstore_dir }}"
+
+    - name: Rename extracted directory
+      command: mv /opt/leanstore-bookkeeper-integration {{ leanstore_dir }}
+      args:
+        creates: "{{ leanstore_dir }}"
+
+    - name: Set correct permissions on transferred files
+      file:
+        path: "{{ leanstore_dir }}"
+        mode: u+rwX,g+rX,o+rX
+        recurse: yes
+
+    - name: Install Python requirements
+      pip:
+        requirements: "{{ leanstore_dir }}/experiment-runner/requirements.txt"
+        executable: pip3
+      tags:
+        - client-install
+
+    - name: Compile Java wrapper and LeanStore
+      shell: |
+        cd {{ leanstore_dir }}/bookkeeper-helper && mvn package
+        cd {{ leanstore_dir }} && mkdir -p build && cd build
+        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+        make tpcc
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        CXX: clang++-14
+
+    - name: Set execute permissions for tpcc binary
+      file:
+        path: "{{ leanstore_dir }}/build/frontend/tpcc"
+        mode: u+x,g+x,o+x
+
