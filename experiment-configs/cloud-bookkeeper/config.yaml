@@ -10,6 +10,7 @@ flags:
   free_pct: 1
   isolation_level: si
   notpcc_warehouse_affinity: true
+  pp_threads: 4
   print_tx_console: true
   profile_latency: true
   run_for_seconds: 120
