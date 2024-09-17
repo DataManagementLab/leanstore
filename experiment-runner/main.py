@@ -51,21 +51,20 @@ def run_experiment(
         cmd = build_cmd(experiment.binary_path, task_flags)
         print(" ".join(cmd))
 
+        if task_flags["ssd_path"] is None:
+            open("./leanstore", mode="w").close()
+        else:
+            open(task_flags["ssd_path"], mode="w").close()
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
         stdout_file_name = os.path.join(results_dir_name, f"{task_name}_stdout.txt")
-        with open(stdout_file_name, "w") as f:
-            if task_flags["ssd_path"] is None:
-                open("./leanstore", mode="w").close()
-            else:
-                open(task_flags["ssd_path"], mode="w").close()
+        with open(stdout_file_name, 'w') as file:
+            file.write(result.stdout)
 
-            proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            )
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                f.write(line)
-
-            proc.wait()
+        stderr_file_name = os.path.join(results_dir_name, f"{task_name}_stderr.txt")
+        with open(stderr_file_name, 'w') as file:
+            file.write(result.stderr)
 
 
 if __name__ == "__main__":

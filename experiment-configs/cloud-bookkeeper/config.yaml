@@ -6,14 +6,13 @@ flags:
   bookkeeper_metadata_uri: zk+hierarchical://localhost:2181/ledgers # NOTE: change this before running
   bookkeeper_read_timeout: 5000
   contention_split: true
-  dram_gib: 20
+  dram_gib: 64
   free_pct: 1
   isolation_level: si
   notpcc_warehouse_affinity: true
   print_tx_console: true
   profile_latency: true
   run_for_seconds: 120
-  ssd_gib: 100
   ssd_path: leanstore
   tpcc_warehouse_count: 100
   wal_pwrite: true
