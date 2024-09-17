@@ -39,7 +39,7 @@
     - name: Remove default SSD mount config
       shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
       when: zk_disk_format_required
-    
+
     - name: Reboot with unmounted SSDs
       ansible.builtin.reboot:
         reboot_timeout: 240
@@ -87,14 +87,14 @@
   vars:
     bk_disk_format_required: bk_fstab_line_count | int > 2
   tasks:
-    - name: Remove default SSD mount config
-      shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
-      when: bk_disk_format_required
-    
-    - name: Reboot with unmounted SSDs
-      ansible.builtin.reboot:
-        reboot_timeout: 240
-      when: bk_disk_format_required
+    # - name: Remove default SSD mount config
+    #   shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
+    #   when: bk_disk_format_required
+
+    # - name: Reboot with unmounted SSDs
+    #   ansible.builtin.reboot:
+    #     reboot_timeout: 240
+    #   when: bk_disk_format_required
 
     - name: Format disks
       filesystem:
@@ -102,10 +102,10 @@
          dev: '{{ item }}'
          force: true
       with_items:
-        - "/dev/xvdb"
-        - "/dev/xvdc"
-      when: bk_disk_format_required
-    
+        - "/dev/nvme0n1"
+        - "/dev/nvme1n1"
+      # when: bk_disk_format_required
+
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
@@ -114,8 +114,8 @@
         opts: defaults,noatime,nodiscard
         state: mounted
       with_items:
-        - { path: "/mnt/journal", src: "/dev/xvdb" }
-        - { path: "/mnt/storage", src: "/dev/xvdc" }
+        - { path: "/mnt/journal", src: "/dev/nvme0n1" }
+        - { path: "/mnt/storage", src: "/dev/nvme1n1" }
 
 - name: Common Installation Tasks
   hosts: all
@@ -243,13 +243,13 @@
         src: "templates/zoo.cfg"
         dest: "{{ zookeeper_install_dir }}/conf/zoo.cfg"
       notify: Restart Zookeeper
-    
+
     - name: Template Zookeeper myid file
       template:
         src: templates/myid
         dest: "{{ zookeeper_data_dir }}/myid"
       notify: Restart Zookeeper
-     
+
   handlers:
     - name: Restart Zookeeper
       become: yes
@@ -266,7 +266,7 @@
         bookkeeper_data_dirs: "/mnt/storage/0,/mnt/storage/1"
         bookkeeper_journal_dir: "/mnt/journal/0,/mnt/journal/1"
         zookeeperServers: "{{ groups['zookeepers'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:2181') | join(',') }}"
-        
+
     # - name: Remove old BookKeeper installation
     #   file:
     #     path: "{{ item }}"
@@ -358,7 +358,7 @@
         state: absent
       tags:
         - client-install
-      
+
     - name: Download and extract synthetic benchmark
       unarchive:
         src: "https://github.com/rzepkamichal/bench/archive/refs/heads/main.zip"
