@@ -69,6 +69,8 @@ def run_experiment(
         with open(stderr_file_name, 'w') as file:
             file.write(result.stderr)
 
+        result.check_returncode()
+
 
 if __name__ == "__main__":
     cwd = os.getcwd()
