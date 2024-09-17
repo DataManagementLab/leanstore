@@ -51,11 +51,14 @@ def run_experiment(
         cmd = build_cmd(experiment.binary_path, task_flags)
         print(" ".join(cmd))
 
-        if task_flags["ssd_path"] is None:
-            open("./leanstore", mode="w").close()
-        else:
-            open(task_flags["ssd_path"], mode="w").close()
+        db_file = "./leanstore"
+        if "ssd_path" in task_flags:
+            db_file = task_flags["ssd_path"]
 
+        if os.path.exists(db_file):
+            os.remove(db_file)
+
+        open(db_file, mode="w").close()
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         stdout_file_name = os.path.join(results_dir_name, f"{task_name}_stdout.txt")

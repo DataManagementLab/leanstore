@@ -51,7 +51,7 @@
   connection: ssh
   become: yes
   vars:
-    leanstore_dir: /opt/leanstore
+    leanstore_dir: /mnt/nvme1n1/leanstore
     leanstore_zip_url: https://github.com/DataManagementLab/leanstore/archive/refs/heads/bookkeeper-integration.zip
   tasks:
     - name: Ensure required packages are installed on the remote host
@@ -88,11 +88,10 @@
       unarchive:
         src: "{{ leanstore_zip_url }}"
         remote_src: yes
-        dest: "/opt"
-        creates: "{{ leanstore_dir }}"
+        dest: "/mnt/nvme1n1"
 
     - name: Rename extracted directory
-      command: mv /opt/leanstore-bookkeeper-integration {{ leanstore_dir }}
+      command: mv /mnt/nvme1n1/leanstore-bookkeeper-integration {{ leanstore_dir }}
       args:
         creates: "{{ leanstore_dir }}"
 
