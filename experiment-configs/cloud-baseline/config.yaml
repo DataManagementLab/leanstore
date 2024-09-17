@@ -12,7 +12,7 @@ flags:
   ssd_path: /mnt/nvme2n1/leanstore.db
   tpcc_warehouse_count: 100
   wal_fsync: true
-  wal_offset_gib: 50
+  wal_offset_gib: 100
   wal_pwrite: true
   wal_variant: 0
   warmup_for_seconds: 5
