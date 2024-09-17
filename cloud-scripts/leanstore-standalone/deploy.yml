@@ -9,6 +9,7 @@
       register: bk_fstab_line_count
       changed_when: false
 
+
 - name: Format and mount disks for client host
   hosts: client-0
   connection: ssh
@@ -16,15 +17,6 @@
   vars:
     bk_disk_format_required: bk_fstab_line_count | int > 2
   tasks:
-    # - name: Remove default SSD mount config
-    #   shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
-    #   when: bk_disk_format_required
-
-    # - name: Reboot with unmounted SSDs
-    #   ansible.builtin.reboot:
-    #     reboot_timeout: 240
-    #   when: bk_disk_format_required
-
     - name: Format disks
       filesystem:
          fstype: xfs
@@ -33,7 +25,6 @@
       with_items:
         - "/dev/nvme1n1"
         - "/dev/nvme2n1"
-      # when: bk_disk_format_required
 
     - name: Mount disks
       mount:
@@ -45,6 +36,7 @@
       with_items:
         - { path: "/mnt/nvme1n1", src: "/dev/nvme1n1" }
         - { path: "/mnt/nvme2n1", src: "/dev/nvme2n1" }
+
 
 - name: Install LeanStore
   hosts: client-0
