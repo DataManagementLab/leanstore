@@ -39,7 +39,7 @@ if __name__ == "__main__":
     assert (throughputs_dfs[args.dirs[0]]["threads"] == throughputs_dfs[args.dirs[1]]["threads"]).all()
 
     fig, axes = plt.subplots(1, 1)
-    for df in throughputs_dfs.values():
+    for dir, df in throughputs_dfs.items():
         axes.plot(df["threads"], df["wal_write_gib"], label=dir)
 
     axes.set_xticks(throughputs_dfs[args.dirs[0]]["threads"])
