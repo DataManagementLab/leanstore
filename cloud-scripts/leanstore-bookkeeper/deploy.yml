@@ -1,0 +1,340 @@
+---
+- name: Initialize some default values
+  hosts: all
+  connection: ssh
+  tasks:
+    - set_fact:
+        private_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+
+
+- name: ZK - Check default disk configuration
+  hosts: zookeepers
+  connection: ssh
+  become: yes
+  tasks:
+    - name: Count fstab lines
+      ansible.builtin.command: wc -l /etc/fstab
+      register: zk_fstab_line_count
+
+
+- name: Format and mount disks for Zookeeper hosts
+  hosts: zookeepers
+  connection: ssh
+  become: yes
+  vars:
+    zk_disk_format_required: zk_fstab_line_count | int > 2
+  tasks:
+    - name: Remove default SSD mount config
+      shell: "head -n -1 /etc/fstab > tempfile && mv tempfile /etc/fstab"
+      when: zk_disk_format_required
+
+    - name: Reboot with unmounted SSDs
+      ansible.builtin.reboot:
+        reboot_timeout: 240
+      when: zk_disk_format_required
+
+    - name: Format disks
+      filesystem:
+        fstype: xfs
+        dev: '{{ item }}'
+        force: true
+      with_items:
+        - "/dev/xvdb"
+        - "/dev/xvdc"
+      when: zk_disk_format_required
+
+    - name: Mount disks
+      mount:
+        path: "{{ item.path }}"
+        src: "{{ item.src }}"
+        fstype: xfs
+        opts: defaults,noatime,nodiscard
+        state: mounted
+      with_items:
+        - { path: "/mnt/zookeeper/logs", src: "/dev/xvdb" }
+        - { path: "/mnt/zookeeper/data", src: "/dev/xvdc" }
+
+
+- name: BK - Check default disk configuration
+  hosts: bookies
+  connection: ssh
+  become: yes
+  tasks:
+    - name: Count fstab lines
+      ansible.builtin.command: wc -l /etc/fstab
+      register: bk_fstab_line_count
+      changed_when: false
+
+
+- name: Format and mount disks for BookKeeper hosts
+  hosts: bookies
+  connection: ssh
+  become: yes
+  vars:
+    bk_disk_format_required: bk_fstab_line_count | int > 2
+  tasks:
+    - name: Format disks
+      filesystem:
+         fstype: xfs
+         dev: '{{ item }}'
+         force: true
+      with_items:
+        - "/dev/nvme0n1"
+        - "/dev/nvme1n1"
+
+    - name: Mount disks
+      mount:
+        path: "{{ item.path }}"
+        src: "{{ item.src }}"
+        fstype: xfs
+        opts: defaults,noatime,nodiscard
+        state: mounted
+      with_items:
+        - { path: "/mnt/journal", src: "/dev/nvme0n1" }
+        - { path: "/mnt/storage", src: "/dev/nvme1n1" }
+
+
+- name: Client - Check default disk configuration
+  hosts: client-0
+  connection: ssh
+  become: yes
+  tasks:
+    - name: Count fstab lines
+      ansible.builtin.command: wc -l /etc/fstab
+      register: bk_fstab_line_count
+      changed_when: false
+
+
+- name: Format and mount disks for client host
+  hosts: client-0
+  connection: ssh
+  become: yes
+  vars:
+    bk_disk_format_required: bk_fstab_line_count | int > 2
+  tasks:
+    - name: Format disks
+      filesystem:
+         fstype: xfs
+         dev: '{{ item }}'
+         force: true
+      with_items:
+        - "/dev/nvme1n1"
+        - "/dev/nvme2n1"
+
+    - name: Mount disks
+      mount:
+        path: "{{ item.path }}"
+        src: "{{ item.src }}"
+        fstype: xfs
+        opts: defaults,noatime,nodiscard
+        state: mounted
+      with_items:
+        - { path: "/mnt/nvme1n1", src: "/dev/nvme1n1" }
+        - { path: "/mnt/nvme2n1", src: "/dev/nvme2n1" }
+
+
+- name: Common Installation Tasks
+  hosts: all
+  connection: ssh
+  become: yes
+  vars:
+    java_version: "17"
+  tasks:
+    - name: Install common dependencies
+      apt:
+        name: 
+          - openjdk-{{ java_version }}-jdk
+          - wget
+          - tar
+          - vim
+          - chrony
+          - dstat
+          - iotop
+        state: present
+        update_cache: yes
+    - name: Change locale to en_US.utf-8
+      shell: |
+        echo 'LANG=en_US.utf-8
+          LC_ALL=en_US.utf-8' > /etc/environment
+
+
+- name: Install and Configure Zookeeper
+  hosts: zookeepers
+  connection: ssh
+  become: yes
+  tasks:
+    - set_fact:
+        zookeeper_version: "3.8.4"
+        zookeeper_install_dir: "/opt/zookeeper"
+        zookeeper_data_dir: "/mnt/zookeeper/data"
+    - set_fact:
+        zid: "{{ groups['zookeepers'].index(inventory_hostname) }}"
+
+    - name: Download and extract Zookeeper
+      unarchive:
+        src: "https://downloads.apache.org/zookeeper/zookeeper-{{ zookeeper_version }}/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+        dest: /opt/
+        remote_src: yes
+        creates: "/opt/apache-zookeeper-{{ zookeeper_version }}-bin"
+
+    - name: Create symbolic link and data directory
+      file:
+        path: "{{ item.path }}"
+        state: "{{ item.state }}"
+        src: "{{ item.src | default(omit) }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - { path: "{{ zookeeper_install_dir }}", state: link, src: "/opt/apache-zookeeper-{{ zookeeper_version }}-bin" }
+        - { path: "{{ zookeeper_data_dir }}", state: directory }
+
+    - name: Template Zookeeper configuration
+      template:
+        src: "templates/zoo.cfg"
+        dest: "{{ zookeeper_install_dir }}/conf/zoo.cfg"
+      notify: Restart Zookeeper
+
+    - name: Template Zookeeper myid file
+      template:
+        src: templates/myid
+        dest: "{{ zookeeper_data_dir }}/myid"
+      notify: Restart Zookeeper
+
+  handlers:
+    - name: Restart Zookeeper
+      become: yes
+      shell: "{{ zookeeper_install_dir }}/bin/zkServer.sh restart"
+
+
+- name: Install and Configure BookKeeper
+  hosts: bookies
+  connection: ssh
+  become: yes
+  tasks:
+    - set_fact:
+        bookkeeper_version: "4.17.1"
+        bookkeeper_install_dir: "/opt/bookkeeper"
+        bookkeeper_data_dirs: "/mnt/storage/0,/mnt/storage/1"
+        bookkeeper_journal_dir: "/mnt/journal/0,/mnt/journal/1"
+        zookeeperServers: "{{ groups['zookeepers'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:2181') | join(',') }}"
+
+    - name: Download and extract BookKeeper
+      unarchive:
+        src: "https://downloads.apache.org/bookkeeper/bookkeeper-{{ bookkeeper_version }}/bookkeeper-server-{{ bookkeeper_version }}-bin.tar.gz"
+        dest: /opt/
+        remote_src: yes
+        creates: "/opt/bookkeeper-server-{{ bookkeeper_version }}"
+
+    - name: Create symbolic link and directories
+      file:
+        path: "{{ item.path }}"
+        state: "{{ item.state }}"
+        src: "{{ item.src | default(omit) }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - { path: "{{ bookkeeper_install_dir }}", state: link, src: "/opt/bookkeeper-server-{{ bookkeeper_version }}" }
+        - { path: "{{ bookkeeper_journal_dir }}", state: directory }
+        - { path: "{{ bookkeeper_data_dirs[0] }}", state: directory }
+    - set_fact:
+        skip_journal: "{{ skip_journal | default(false) }}"
+
+    - name: Apply BookKeeper configuration file [Bypass Journal]
+      template:
+        src: "templates/bookkeeper-skip-journal.conf"
+        dest: "{{ bookkeeper_install_dir }}/conf/bk_server.conf"
+      notify: Restart BookKeeper
+      when: skip_journal|bool
+
+    - name: Apply BookKeeper configuration file
+      template:
+        src: "templates/bookkeeper.conf"
+        dest: "/{{ bookkeeper_install_dir }}/conf/bk_server.conf"
+      notify: Restart BookKeeper
+      when: not skip_journal|bool
+
+    - name: Run metaformat command
+      shell: "{{ bookkeeper_install_dir }}/bin/bookkeeper shell metaformat"
+      when: inventory_hostname == groups['bookies'][0]
+
+  handlers:
+    - name: Restart BookKeeper
+      become: yes
+      shell: "{{ bookkeeper_install_dir }}/bin/bookkeeper-daemon.sh restart bookie"
+
+
+- name: Install LeanStore
+  hosts: client-0
+  connection: ssh
+  become: yes
+  vars:
+    leanstore_dir: /mnt/nvme1n1/leanstore
+    leanstore_zip_url: https://github.com/DataManagementLab/leanstore/archive/refs/heads/bookkeeper-integration.zip
+  tasks:
+    - name: Ensure required packages are installed on the remote host
+      apt:
+        name: 
+          - cmake
+          - libtbb2-dev
+          - libaio-dev
+          - libsnappy-dev
+          - zlib1g-dev
+          - libbz2-dev
+          - liblz4-dev
+          - libzstd-dev
+          - librocksdb-dev
+          - liblmdb-dev
+          - libwiredtiger-dev
+          - liburing-dev
+          - openjdk-17-jdk
+          - maven
+          - clang-14
+          - unzip
+          - dstat
+          - python3
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Remove existing LeanStore installation
+      ansible.builtin.file:
+        path: "{{ leanstore_dir }}"
+        state: absent
+
+    - name: Download and extract LeanStore
+      unarchive:
+        src: "{{ leanstore_zip_url }}"
+        remote_src: yes
+        dest: "/mnt/nvme1n1"
+
+    - name: Rename extracted directory
+      command: mv /mnt/nvme1n1/leanstore-bookkeeper-integration {{ leanstore_dir }}
+
+    - name: Set correct permissions on transferred files
+      file:
+        path: "{{ leanstore_dir }}"
+        mode: u+rwX,g+rX,o+rX
+        recurse: yes
+
+    - name: Install Python requirements
+      pip:
+        requirements: "{{ leanstore_dir }}/experiment-runner/requirements.txt"
+        executable: pip3
+      tags:
+        - client-install
+
+    - name: Compile Java wrapper and LeanStore
+      shell: |
+        cd {{ leanstore_dir }}/bookkeeper-helper && mvn package
+        cd {{ leanstore_dir }} && mkdir -p build && cd build
+        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+        make tpcc
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        CXX: clang++-14
+
+    - name: Set execute permissions for tpcc binary
+      file:
+        path: "{{ leanstore_dir }}/build/frontend/tpcc"
+        mode: u+x,g+x,o+x
+
